@@ -83,7 +83,7 @@ def clear_all_positions(exchange: Exchange) -> None:
             exchange.insert_order(s, price=100000, volume=-p, side='bid', order_type='ioc')
 
 
-def sell_all_positions(exchange: Exchange, positions: Dict[str, int], max_a: PriceVolumeTuple, max_b: PriceVolumeTuple):
+def sell_all_positions(exchange: Exchange, positions: Dict[str, int], max_a: PriceVolumeTuple, max_b: PriceVolumeTuple, target):
     """ Sell all positions at the highest price
     """
 
@@ -92,19 +92,18 @@ def sell_all_positions(exchange: Exchange, positions: Dict[str, int], max_a: Pri
     if max_a is None or max_b is None:
         return
 
+    maxVol = abs(positions["PHILIPS_A"] + positions["PHILIPS_B"]) - target
+    
+    if maxVol <= 0:
+        return
+
     if max_a.price > max_b.price:
-        maxPriceA = max_a.price
-        maxVolA = max_a.volume #min(positions["PHILIPS_A"], max_a.volume)
-        if maxVolA > 0:
-            make_orders(exchange, [Order("PHILIPS_A", maxPriceA, maxVolA, "ask", "ioc")])
+        make_orders(exchange, [Order("PHILIPS_A", max_a.price, maxVol, "ask", "ioc")])
     else:
-        maxPriceB = max_b.price
-        maxVolB = max_b.volume #min(positions["PHILIPS_B"], max_b.volume)
-        if maxVolB > 0:
-            make_orders(exchange, [Order("PHILIPS_B", maxPriceB, maxVolB, "ask", "ioc")])
+        make_orders(exchange, [Order("PHILIPS_B", max_b.price, maxVol, "ask", "ioc")])
 
 
-def buy_all_positions(exchange: Exchange, positions: Dict[str, int], min_a: PriceVolumeTuple, min_b: PriceVolumeTuple):
+def buy_all_positions(exchange: Exchange, positions: Dict[str, int], min_a: PriceVolumeTuple, min_b: PriceVolumeTuple, target):
     """ Buy all positions at the lowest price
     """
 
@@ -112,25 +111,26 @@ def buy_all_positions(exchange: Exchange, positions: Dict[str, int], min_a: Pric
 
     if min_a is None or min_b is None:
         return
+    
+    maxVol = abs(positions["PHILIPS_A"] + positions["PHILIPS_B"]) - target
+    
+    if maxVol <= 0:
+        return
 
     if min_a.price < min_b.price:
-        maxVolA = min_a.volume #min(positions["PHILIPS_A"], min_a.volume)
-        if maxVolA > 0:
-            make_orders(exchange, [Order("PHILIPS_A", min_a.price, maxVolA, "bid", "ioc")])
+        make_orders(exchange, [Order("PHILIPS_A", min_a.price, maxVol, "bid", "ioc")])
     else:
-        maxVolB = min_b.volume # min(positions["PHILIPS_B"], min_b.volume)
-        if maxVolB > 0:
-            make_orders(exchange, [Order("PHILIPS_B", min_b.price, maxVolB, "bid", "ioc")])
+        make_orders(exchange, [Order("PHILIPS_B", min_b.price, maxVol, "bid", "ioc")])
 
 
 def balance_individual(exchange, positions: Dict[str, int], instrument, target, individual_threshold):
     if positions[instrument] > individual_threshold:
         max_price = get_best_price(exchange.get_last_price_book(instrument), "sell")
-        make_orders(exchange, [Order(instrument, max_price.price, 100, "ask", "ioc")])
+        make_orders(exchange, [Order(instrument, max_price.price, abs(positions[instrument]) - 1.5 * target, "ask", "ioc")])
 
     elif positions[instrument] < -individual_threshold:
         min_price = get_best_price(exchange.get_last_price_book(instrument), "buy")
-        make_orders(exchange, [Order(instrument, min_price.price, 100, "bid", "ioc")])
+        make_orders(exchange, [Order(instrument, min_price.price, abs(positions[instrument]) - 1.5 * target, "bid", "ioc")])
 
     else:
         return False
@@ -152,14 +152,16 @@ def balance_positions(exchange: Exchange, total_threshold: int = 100, individual
         sell_all_positions(
             exchange, positions,
             max_a=get_best_price(exchange.get_last_price_book("PHILIPS_A"), "sell"),
-            max_b=get_best_price(exchange.get_last_price_book("PHILIPS_B"), "sell")
+            max_b=get_best_price(exchange.get_last_price_book("PHILIPS_B"), "sell"),
+            target=total_threshold/4
         )
 
     elif total_position < -total_threshold:
         buy_all_positions(
             exchange, positions,
             min_a=get_best_price(exchange.get_last_price_book("PHILIPS_A"), "buy"),
-            min_b=get_best_price(exchange.get_last_price_book("PHILIPS_B"), "buy")
+            min_b=get_best_price(exchange.get_last_price_book("PHILIPS_B"), "buy"),
+            target=total_threshold/4
         )
 
     return False

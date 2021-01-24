@@ -4,7 +4,7 @@ instrument_prefix = "PHILIPS_"
 markets = ("A", "B")
 
 MAX_TRADE_SIZE = 20
-MAX_LOSS_AMOUNT = 5000
+MAX_LOSS_AMOUNT = 1000
 
 
 def sell_above(book, min_price: float) -> int:
@@ -44,13 +44,23 @@ def arbitrage(e):
     try_arbitrage(e, books, "B", "A")
 
 
-def stoikov_mm(e, instrument_id, volume=5, delta=0.1):
+def stoikov_mm(e, instrument_id, volatile, volume=5, delta=0):
     e.delete_orders(instrument_id)
+    
+    # Stay out of the markets until they calm down
+    if volatile:
+        return
+    
     book = e.get_last_price_book(instrument_id)
 
     spread = get_spread(book)
-    if spread is None or spread < 3 * delta:
+    if spread is None or spread < 0.5 or spread < 5 * delta:
+        print("Spread is too tight")
         return False
+        
+    if spread > 1:
+        delta = 0.1
+        volumn = 20
 
     best_ask = get_best_price(book, "ask")
     best_bid = get_best_price(book, "bid")
@@ -67,9 +77,10 @@ def should_kill_attempt(exchange, start_pnl):
     current_pnl = exchange.get_pnl()
 
     if current_pnl is None or start_pnl is None:
+        print("get_pnl failed")
         return False
 
-    if current_pnl > start_pnl + MAX_LOSS_AMOUNT:
+    if current_pnl < start_pnl - MAX_LOSS_AMOUNT:
         print(f"Starting pnl {start_pnl}")
         print(f"Current pnl {current_pnl}")
         return True
