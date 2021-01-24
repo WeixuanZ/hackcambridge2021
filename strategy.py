@@ -4,7 +4,7 @@ instrument_prefix = "PHILIPS_"
 markets = ("A", "B")
 
 MAX_TRADE_SIZE = 20
-MAX_LOSS_AMOUNT = 1000
+MAX_LOSS_AMOUNT = 2000
 
 
 def sell_above(book, min_price: float) -> int:
@@ -45,8 +45,6 @@ def arbitrage(e):
 
 
 def stoikov_mm(e, instrument_id, volatile, volume=5, delta=0):
-    e.delete_orders(instrument_id)
-    
     # Stay out of the markets until they calm down
     if volatile:
         return
@@ -54,13 +52,17 @@ def stoikov_mm(e, instrument_id, volatile, volume=5, delta=0):
     book = e.get_last_price_book(instrument_id)
 
     spread = get_spread(book)
-    if spread is None or spread < 0.5 or spread < 5 * delta:
+    if spread is None or spread < 0.3 or spread < 5 * delta:
         print("Spread is too tight")
+        make_orders(e, [
+            Order(instrument_id, 2, volume, "bid", "limit"),
+            Order(instrument_id, 100, volume, "ask", "limit")
+        ])
         return False
         
     if spread > 1:
         delta = 0.1
-        volumn = 20
+        volume = 100
 
     best_ask = get_best_price(book, "ask")
     best_bid = get_best_price(book, "bid")

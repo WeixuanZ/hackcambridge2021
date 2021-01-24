@@ -57,11 +57,13 @@ def make_orders(exchange: Exchange, orders: List[Order]):
         trade_history = exchange.get_trade_history(order.instrument_id)
 
         if len(trade_history) > 0 and trade_history[-1].order_id == order_id:
-            success_msg = "SUCCESS"
+            success_msg = "SUCCESS    "
+        elif order.order_type == "ioc":
+            success_msg = "FAILED     "
         else:
-            success_msg = "FAILED "
+            success_msg = "OUTSTANDING"
 
-        order_log = f"Order: {order_id} {success_msg}     | Instrument: {order.instrument_id} | Price: {order.price:.1f} | Volume: {order.volume} | Side: {order.side} | Order Type: {order.order_type}"
+        order_log = f"Order: {order_id} {success_msg} | Instrument: {order.instrument_id} | Price: {order.price:.1f} | Volume: {order.volume} | Side: {order.side} | Order Type: {order.order_type}"
 
         g_recent_orders.pop(0)
         g_recent_orders.append(order_log)
@@ -126,11 +128,11 @@ def buy_all_positions(exchange: Exchange, positions: Dict[str, int], min_a: Pric
 def balance_individual(exchange, positions: Dict[str, int], instrument, target, individual_threshold):
     if positions[instrument] > individual_threshold:
         max_price = get_best_price(exchange.get_last_price_book(instrument), "sell")
-        make_orders(exchange, [Order(instrument, max_price.price, abs(positions[instrument]) - 1.5 * target, "ask", "ioc")])
+        make_orders(exchange, [Order(instrument, max_price.price, abs(positions[instrument]) - target, "ask", "ioc")])
 
     elif positions[instrument] < -individual_threshold:
         min_price = get_best_price(exchange.get_last_price_book(instrument), "buy")
-        make_orders(exchange, [Order(instrument, min_price.price, abs(positions[instrument]) - 1.5 * target, "bid", "ioc")])
+        make_orders(exchange, [Order(instrument, min_price.price, abs(positions[instrument]) - target, "bid", "ioc")])
 
     else:
         return False
@@ -138,7 +140,7 @@ def balance_individual(exchange, positions: Dict[str, int], instrument, target, 
     return True
 
 
-def balance_positions(exchange: Exchange, total_threshold: int = 100, individual_threshold: int = 400):
+def balance_positions(exchange: Exchange, total_threshold: int = 100, individual_threshold: int = 350):
     positions = exchange.get_positions()
 
     pos_a, pos_b = positions["PHILIPS_A"], positions["PHILIPS_B"]

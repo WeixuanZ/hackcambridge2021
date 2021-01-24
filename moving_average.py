@@ -1,7 +1,7 @@
 class MovingAverage:
     "Volume-weighed moving average"
     
-    def __init__(self, exchange, instrument_id, length=50, threshold=0.1):
+    def __init__(self, exchange, instrument_id, length=50, threshold=0.02):
         self.e = exchange
         self.instrument_id = instrument_id
         self.length = length
